@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>イベントシフト管理ツール</title>
+<style>
+  :root { --border:#d9dde5; --bg:#f6f7f9; --card:#fff; --text:#222; --sub:#666; --accent:#4f6bed; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif; color:var(--text); background:var(--bg); }
+  main { max-width:1100px; margin:32px auto; padding:0 16px 48px; }
+  h1 { font-size:26px; margin:0 0 8px; }
+  h2 { font-size:19px; margin:0 0 16px; }
+  .lead { color:var(--sub); margin:0 0 24px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:18px; box-shadow:0 2px 8px rgba(0,0,0,.03); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  label { display:block; font-size:13px; color:var(--sub); margin-bottom:5px; }
+  select,input,button { font:inherit; }
+  select,input { border:1px solid #cfd4dd; border-radius:8px; padding:9px 10px; background:#fff; }
+  button { border:0; border-radius:8px; padding:9px 13px; cursor:pointer; background:var(--accent); color:white; }
+  button.secondary { background:#eef0f5; color:#333; }
+  button.danger { background:#e85b5b; }
+  .hidden { display:none; }
+  .event-summary { margin-top:14px; padding:12px 14px; background:#f2f4ff; border-radius:9px; }
+  .hint { color:var(--sub); font-size:13px; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:780px; }
+  th,td { border-bottom:1px solid var(--border); padding:9px 7px; text-align:left; vertical-align:middle; }
+  th { font-size:13px; color:var(--sub); background:#fafbfc; }
+  td input,td select { width:100%; min-width:80px; }
+  .num { text-align:right; }
+  .small { width:90px !important; min-width:70px !important; }
+  .person { min-width:130px !important; }
+  .availability-list { display:flex; flex-direction:column; gap:6px; min-width:230px; }
+  .play-row select { min-width:88px; }
+  .availability-row { display:flex; gap:5px; align-items:center; }
+  .availability-row select { width:88px; min-width:88px; }
+  .availability-row button { padding:5px 8px; }
+  .add-availability { background:#eef0f5; color:#333; padding:5px 9px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .status { margin-top:12px; padding:11px 13px; border-radius:8px; background:#f7f7f7; }
+  .status.ok { background:#eef8f0; }
+  .status.warn { background:#fff5e7; }
+  .result-hour { border:1px solid var(--border); border-radius:10px; margin:10px 0; padding:13px; background:#fff; }
+  .result-hour h3 { margin:0 0 8px; font-size:16px; }
+  .selected { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { background:#eef0f5; border-radius:999px; padding:5px 9px; font-size:13px; }
+  .pill strong { margin-left:3px; }
+  .muted { color:#888; }
+  .formula { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#f5f6f8; padding:10px; border-radius:8px; margin-top:10px; }
+  .matrix-wrap { overflow:auto; margin-top:14px; }
+  .shift-matrix { border-collapse:collapse; min-width:max-content; }
+  .shift-matrix th, .shift-matrix td { border:1px solid var(--border); padding:7px 9px; text-align:center; white-space:nowrap; }
+  .shift-matrix th:first-child, .shift-matrix td:first-child { position:sticky; left:0; background:#fff; z-index:2; text-align:left; }
+  .shift-matrix thead th { position:sticky; top:0; z-index:3; background:#fafbfc; }
+  .matrix-shift { background:#eef8f0; font-weight:600; }
+  .matrix-wait { background:#fff5e7; color:#8a641e; }
+  .matrix-unavailable { color:#bbb; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:700px) { .two { grid-template-columns:1fr; } main { margin-top:18px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>イベントシフト管理ツール</h1>
+  <p class="lead">自分のプレイ予定 → シフト提出 → 実効値・総合力の順で1時間あたり最大4人を自動選出。</p>
+
+  <section class="card">
+    <h2>1. イベント期間</h2>
+    <div class="row">
+      <div>
+        <label>開始日</label>
+        <select id="startDay"></select>
+      </div>
+      <div>
+        <label>開始時刻</label>
+        <select id="startTime"></select>
+      </div>
+      <div>
+        <label>終了日</label>
+        <select id="endDay"></select>
+      </div>
+      <div>
+        <label>終了時刻</label>
+        <select id="endTime"></select>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button type="button" class="secondary" id="toggleYM">年・月を入力</button>
+    </div>
+
+    <div id="eventYM" class="row hidden" style="margin-top:14px;">
+      <div>
+        <label>年</label>
+        <select id="year"></select>
+      </div>
+      <div>
+        <label>月</label>
+        <select id="month"></select>
+      </div>
+    </div>
+
+    <div id="eventSummary" class="event-summary">イベント期間は任意です。プレイ予定だけでもシフトを作成できます。</div>
+  </section>
+
+  <section class="card">
+    <h2>2. 自分のプレイ予定</h2>
+    <p class="hint">自分が実際にプレイする時間帯。ここに入れた時間について、シフトを組みます。</p>
+    <div id="playRows"></div>
+    <div class="controls">
+      <button type="button" id="addPlay">＋ プレイ予定を追加</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. シフト提出</h2>
+    <p class="hint">名前・シフト可能時間・先頭値・内部値・総合力を入力。実効値は自動計算します。</p>
+    <div class="formula">実効値 = ((内部値 − 先頭値) ÷ 5) + 先頭値</div>
+    <div class="table-wrap" style="margin-top:14px;">
+      <table>
+        <thead>
+          <tr>
+            <th>名前</th><th>シフト可能時間</th><th>待機</th>
+            <th>先頭値</th><th>内部値</th><th>総合力</th><th>実効値</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="shiftBody"></tbody>
+      </table>
+    </div>
+    <div class="controls">
+      <button type="button" id="addShift">＋ シフト提出を追加</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>4. シフトを組む</h2>
+    <p class="hint">各1時間枠について、シフト可能な人のうち<strong>内部値が高い順</strong>に最大4人を参加として選び、5人目以降は「待機」として表示します。待機欄を外した人は待機に入りません。</p>
+    <button type="button" id="makeShift">シフトを自動作成</button>
+    <button type="button" class="secondary" id="discordShare">表を画像としてコピー</button>
+    <div id="result" style="margin-top:14px;"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+const now = new Date();
+const currentYear = now.getFullYear();
+const currentMonth = now.getMonth()+1;
+
+for(let y=currentYear-2;y<=currentYear+2;y++){
+  $('year').insertAdjacentHTML('beforeend', `<option value="${y}">${y}年</option>`);
+}
+$('year').value = currentYear;
+
+for(let m=1;m<=12;m++){
+  $('month').insertAdjacentHTML('beforeend', `<option value="${m}">${m}月</option>`);
+}
+$('month').value = currentMonth;
+
+function fillDays(){
+  const days = new Date(Number($('year').value), Number($('month').value), 0).getDate();
+  for(const id of ['startDay','endDay']){
+    const old = $(id).value;
+    $(id).innerHTML='';
+    for(let d=1;d<=days;d++) $(id).insertAdjacentHTML('beforeend', `<option value="${d}">${d}日</option>`);
+    if(old && Number(old)<=days) $(id).value=old;
+  }
+  if(!$('startDay').value) $('startDay').value=1;
+  if(!$('endDay').value) $('endDay').value=days;
+}
+
+function fillTimes(){
+  for(const id of ['startTime','endTime']){
+    const old=$(id).value;
+    $(id).innerHTML='';
+    for(let h=0;h<24;h++){
+      const m=0;
+      const v=`${pad(h)}:${pad(m)}`;
+      $(id).insertAdjacentHTML('beforeend', `<option value="${v}">${v}</option>`);
+    }
+    if(old) $(id).value=old;
+  }
+  if(!$('startTime').value) $('startTime').value='00:00';
+  if(!$('endTime').value) $('endTime').value='23:00';
+}
+
+function dateText(day,time){
+  return `${$('year').value}/${pad($('month').value)}/${pad(day)} ${time}`;
+}
+
+function eventDateObj(day,time){
+  const [h,m]=time.split(':').map(Number);
+  return new Date(Number($('year').value),Number($('month').value)-1,Number(day),h,m);
+}
+
+function updateEvent(){
+  fillDays();
+  const s=eventDateObj($('startDay').value,$('startTime').value);
+  const e=eventDateObj($('endDay').value,$('endTime').value);
+  if(e<=s){
+    $('eventSummary').innerHTML='<strong>終了日時は開始日時より後にしてください。</strong>';
+    $('eventSummary').className='event-summary';
+  }else{
+    const hours=(e-s)/3600000;
+    $('eventSummary').innerHTML=`イベント期間：<strong>${dateText($('startDay').value,$('startTime').value)} ～ ${dateText($('endDay').value,$('endTime').value)}</strong><br><span class="hint">期間：約 ${hours} 時間</span>`;
+  }
+  refreshTimeSelects();
+  document.querySelectorAll('.play-start-day, .play-end-day').forEach(select=>{
+    const old=select.value;
+    select.innerHTML=playDateOptions(old);
+    if(!select.value) select.value='1';
+  });
+  document.querySelectorAll('.shift-start-day, .shift-end-day').forEach(select=>{
+    const old=select.value;
+    select.innerHTML=playDateOptions(old);
+    if(!select.value) select.value='1';
+  });
+}
+
+$('toggleYM').onclick=()=>{
+  $('eventYM').classList.toggle('hidden');
+  $('toggleYM').textContent=$('eventYM').classList.contains('hidden')?'年・月を入力':'年・月を閉じる';
+  updateEvent();
+};
+
+$('year').onchange=updateEvent;
+$('month').onchange=updateEvent;
+['startDay','endDay','startTime','endTime'].forEach(id=>$(id).onchange=updateEvent);
+
+function timeOptions(selected=''){
+  let s='';
+  for(let h=0;h<24;h++){
+    const v=`${pad(h)}:00`;
+    s+=`<option value="${v}" ${v===selected?'selected':''}>${v}</option>`;
+  }
+  return s;
+}
+
+function playDateOptions(selected=''){
+  const days = new Date(Number($('year').value), Number($('month').value), 0).getDate();
+  let s='';
+  for(let d=1;d<=days;d++){
+    const v=String(d);
+    s+=`<option value="${v}" ${v===String(selected)?'selected':''}>${d}日</option>`;
+  }
+  return s;
+}
+
+function addPlayRow(data={}){
+  const row=document.createElement('div');
+  row.className='row play-row';
+  row.style.marginBottom='9px';
+  row.innerHTML=`
+    <div>
+      <label>開始日</label>
+      <select class="play-start-day">${playDateOptions(data.startDay||$('startDay').value||'1')}</select>
+    </div>
+    <div>
+      <label>開始</label>
+      <select class="play-start">${timeOptions(data.start||'')}</select>
+    </div>
+    <div>
+      <label>終了日</label>
+      <select class="play-end-day">${playDateOptions(data.endDay||data.startDay||$('startDay').value||'1')}</select>
+    </div>
+    <div>
+      <label>終了</label>
+      <select class="play-end">${timeOptions(data.end||'')}</select>
+    </div>
+    <button type="button" class="danger remove">削除</button>`;
+  row.querySelector('.remove').onclick=()=>row.remove();
+  $('playRows').appendChild(row);
+}
+
+$('addPlay').onclick=()=>addPlayRow();
+$('addShift').onclick=()=>addShiftRow();
+
+function addShiftRow(data={}){
+  const tr=document.createElement('tr');
+  const slots = (data.slots && data.slots.length) ? data.slots : [{start:'',end:''}];
+
+  tr.innerHTML=`
+    <td><input class="person" placeholder="名前" value="${data.name||''}"></td>
+    <td>
+      <div class="availability-list"></div>
+      <button type="button" class="add-availability">＋ 時間帯を追加</button>
+    </td>
+    <td style="text-align:center;"></td>
+    <td><input class="small first" type="number" step="any" value="${data.first??''}"></td>
+    <td><input class="small internal" type="number" step="any" value="${data.internal??''}"></td>
+    <td><input class="small total" type="number" step="any" value="${data.total??''}"></td>
+    <td class="effective">-</td>
+    <td><button type="button" class="wait-toggle">待機〇</button></td>
+    <td><button type="button" class="danger remove">削除</button></td>`;
+
+  const list=tr.querySelector('.availability-list');
+
+  function addAvailabilityRow(slot={}){
+    const row=document.createElement('div');
+    row.className='availability-row';
+    row.innerHTML=`
+      <select class="shift-start-day">${playDateOptions(slot.startDay||$('startDay').value||'1')}</select>
+      <select class="shift-start">${timeOptions(slot.start||'')}</select>
+      <span>～</span>
+      <select class="shift-end-day">${playDateOptions(slot.endDay||slot.startDay||$('startDay').value||'1')}</select>
+      <select class="shift-end">${timeOptions(slot.end||'')}</select>
+      <button type="button" class="danger remove-slot">×</button>`;
+    row.querySelector('.remove-slot').onclick=()=>{
+      if(list.children.length > 1) row.remove();
+    };
+    list.appendChild(row);
+  }
+
+  slots.forEach(addAvailabilityRow);
+
+  tr.querySelector('.add-availability').onclick=(e)=>{
+    e.preventDefault();
+    addAvailabilityRow();
+  };
+  tr.querySelector('.remove').onclick=(e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    tr.remove();
+  };
+
+  const waitToggle=tr.querySelector('.wait-toggle');
+  waitToggle.dataset.waitOk='true';
+  waitToggle.onclick=()=>{
+    const noWait=waitToggle.classList.toggle('no-wait');
+    waitToggle.dataset.waitOk=noWait?'false':'true';
+    waitToggle.textContent=noWait?'待機×':'待機〇';
+  };
+
+  for(const c of tr.querySelectorAll('input')) c.oninput=()=>calcEffective(tr);
+  $('shiftBody').appendChild(tr);
+  calcEffective(tr);
+}
+
+
+function calcEffective(tr){
+  const first=parseFloat(tr.querySelector('.first').value);
+  const internal=parseFloat(tr.querySelector('.internal').value);
+  const cell=tr.querySelector('.effective');
+  if(Number.isFinite(first)&&Number.isFinite(internal)){
+    const v=((internal-first)/5)+first;
+    cell.textContent=Number.isInteger(v)?v:v.toFixed(2);
+  }else cell.textContent='-';
+}
+
+function refreshTimeSelects(){
+  // プレイ・シフト用の時刻選択肢は常に30分刻み。
+}
+
+function getEvent(){
+  const s=eventDateObj($('startDay').value,$('startTime').value);
+  const e=eventDateObj($('endDay').value,$('endTime').value);
+  return {s,e};
+}
+
+function overlapsHour(personStart,personEnd,hourStart,hourEnd){
+  return personStart <= hourStart && personEnd >= hourEnd;
+}
+
+function localDate(day,time){
+  return eventDateObj(day,time);
+}
+
+function getPlannedHours(){
+  const rows=[...document.querySelectorAll('.play-row')];
+  const out=[];
+
+  for(const r of rows){
+    const startDay=Number(r.querySelector('.play-start-day').value);
+    const endDay=Number(r.querySelector('.play-end-day').value);
+    const [sh,sm]=r.querySelector('.play-start').value.split(':').map(Number);
+    const [eh,em]=r.querySelector('.play-end').value.split(':').map(Number);
+
+    const a=new Date(Number($('year').value),Number($('month').value)-1,startDay,sh,sm);
+    const b=new Date(Number($('year').value),Number($('month').value)-1,endDay,eh,em);
+
+    if(b>a) out.push({a,b});
+  }
+
+  if(out.length===0) return [];
+
+  // イベント期間は任意。プレイ予定の最初～最後をそのまま使用する。
+  const minTime=new Date(Math.min(...out.map(x=>x.a.getTime())));
+  const maxTime=new Date(Math.max(...out.map(x=>x.b.getTime())));
+
+  const hours=[];
+  const base=new Date(minTime);
+  base.setMinutes(0,0,0);
+
+  for(let t=new Date(base); t<maxTime; t=new Date(t.getTime()+3600000)){
+    const hEnd=new Date(t.getTime()+3600000);
+    if(t < minTime || hEnd > maxTime) continue;
+    if(out.some(x=>x.a<=t && x.b>=hEnd)){
+      hours.push({start:new Date(t),end:hEnd});
+    }
+  }
+  return hours;
+}
+function fmt(d){
+  return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+$('makeShift').onclick=()=>{
+  const planned=getPlannedHours();
+
+  if(planned.length===0){
+    $('result').innerHTML='<div class="status warn">プレイ予定がありません。プレイ予定を1時間以上のまとまりで入力してください。</div>';
+    return;
+  }
+
+  const people=[...$('shiftBody').querySelectorAll('tr')].map((tr,i)=>{
+    const name=tr.querySelector('.person').value.trim() || `未設定${i+1}`;
+
+    const slots=[...tr.querySelectorAll('.availability-row')].map(row=>{
+      const startDay=Number(row.querySelector('.shift-start-day').value);
+      const endDay=Number(row.querySelector('.shift-end-day').value);
+      const start=row.querySelector('.shift-start').value;
+      const end=row.querySelector('.shift-end').value;
+      const [sh,sm]=start.split(':').map(Number);
+      const [eh,em]=end.split(':').map(Number);
+      const a=new Date(Number($('year').value),Number($('month').value)-1,startDay,sh,sm);
+      const b=new Date(Number($('year').value),Number($('month').value)-1,endDay,eh,em);
+      return {startDay,endDay,start,end,a,b};
+    }).filter(x=>x.end);
+
+    const first=parseFloat(tr.querySelector('.first').value);
+    const internal=parseFloat(tr.querySelector('.internal').value);
+    const total=parseFloat(tr.querySelector('.total').value);
+    const waitButton=tr.querySelector('.wait-toggle');
+    const waitOk=waitButton ? !waitButton.classList.contains('no-wait') : true;
+    const effective=(Number.isFinite(first)&&Number.isFinite(internal))?((internal-first)/5)+first:NaN;
+    return {name,slots,first,internal,total,effective,waitOk};
+  }).filter(p=>Number.isFinite(p.internal));
+
+  // 横：日時、縦：シフト可能な人、というマトリクスで表示
+  let html='';
+  const slots=planned;
+
+  // 各時間の選出結果を先に作る
+  const slotResults=slots.map(slot=>{
+    const candidates=people
+      .filter(p=>p.slots.some(x=>overlapsHour(x.a,x.b,slot.start,slot.end)))
+      .sort((a,b)=>{
+        const ea=Number.isFinite(a.effective)?a.effective:-Infinity;
+        const eb=Number.isFinite(b.effective)?b.effective:-Infinity;
+        if(eb!==ea) return eb-ea;
+        const ta=Number.isFinite(a.total)?a.total:-Infinity;
+        const tb=Number.isFinite(b.total)?b.total:-Infinity;
+        return tb-ta;
+      });
+
+    const status=new Map();
+    candidates.forEach((p,i)=>{
+      if(i<4) status.set(p,'shift');
+      else if(p.waitOk===true) status.set(p,'wait');
+    });
+    return {slot,status};
+  });
+
+  // シフトまたは待機になる人だけを表示
+  const visiblePeople=people
+    .filter(person=>slotResults.some(r=>r.status.has(person)))
+    .sort((a,b)=>{
+      const ea=Number.isFinite(a.effective)?a.effective:-Infinity;
+      const eb=Number.isFinite(b.effective)?b.effective:-Infinity;
+      if(eb!==ea) return eb-ea;
+      const ta=Number.isFinite(a.total)?a.total:-Infinity;
+      const tb=Number.isFinite(b.total)?b.total:-Infinity;
+      return tb-ta;
+    });
+
+  if(visiblePeople.length===0){
+    html='<div class="status warn">シフトまたは待機になる人がいません。</div>';
+  }else{
+    html+='<div class="matrix-wrap"><table class="shift-matrix"><thead><tr><th>名前</th>';
+    for(const {slot} of slotResults){
+      html+=`<th>${fmt(slot.start)}<br>～<br>${fmt(slot.end)}</th>`;
+    }
+    html+='</tr></thead><tbody>';
+
+    for(const person of visiblePeople){
+      html+=`<tr><td><strong>${escapeHtml(person.name)}</strong><br><span class="hint">内部値 ${fmtNum(person.internal)}</span></td>`;
+
+      for(const {status} of slotResults){
+        const state=status.get(person);
+        if(state==='shift'){
+          html+='<td class="matrix-shift">シフト</td>';
+        }else if(state==='wait'){
+          html+='<td class="matrix-wait">待機</td>';
+        }else{
+          html+='<td></td>';
+        }
+      }
+      html+='</tr>';
+    }
+    html+='</tbody></table></div>';
+
+    html+=`<div class="hint" style="margin-top:10px;">表示されるのは、少なくとも1時間「シフト」または「待機」になる人だけです。</div>`;
+  }
+  $('result').innerHTML=html;
+};
+
+function fmtNum(v){ return Number.isInteger(v)?String(v):v.toFixed(2); }
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 初期表示
+fillDays();
+fillTimes();
+addPlayRow();
+addShiftRow();
+addShiftRow();
+
+
+async function copyShiftTableAsImage(){
+  const table=$('result').querySelector('.shift-matrix');
+  if(!table) return false;
+
+  const clone=table.cloneNode(true);
+  clone.style.position='absolute';
+  clone.style.left='-100000px';
+  clone.style.top='0';
+  clone.style.background='#fff';
+  clone.style.color='#222';
+  clone.style.margin='0';
+  clone.style.width='max-content';
+  clone.style.maxWidth='none';
+
+  // Sticky positioning is useful on screen but not in the copied image.
+  clone.querySelectorAll('*').forEach(el=>{
+    el.style.position='static';
+    el.style.backgroundColor = getComputedStyle(el).backgroundColor;
+    el.style.color = getComputedStyle(el).color;
+  });
+
+  document.body.appendChild(clone);
+
+  const rect=clone.getBoundingClientRect();
+  const scale=2;
+  const padding=24;
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.ceil(rect.width*scale+padding*2*scale);
+  canvas.height=Math.ceil(rect.height*scale+padding*2*scale);
+
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Draw the table through SVG foreignObject so the current HTML table styling
+  // is preserved as closely as possible.
+  const serialized=new XMLSerializer().serializeToString(clone);
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">
+    <foreignObject width="100%" height="100%">
+      <div xmlns="http://www.w3.org/1999/xhtml">${serialized}</div>
+    </foreignObject>
+  </svg>`;
+
+  const blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+
+  await new Promise((resolve,reject)=>{
+    img.onload=resolve;
+    img.onerror=reject;
+    img.src=url;
+  });
+
+  ctx.drawImage(img,padding*scale,padding*scale,rect.width*scale,rect.height*scale);
+
+  URL.revokeObjectURL(url);
+  clone.remove();
+
+  const pngBlob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+  if(!pngBlob) return false;
+
+  try{
+    await navigator.clipboard.write([
+      new ClipboardItem({'image/png':pngBlob})
+    ]);
+    return true;
+  }catch(e){
+    // Browsers that don't allow image clipboard writing will fall back to
+    // opening the generated PNG in a new tab, so it can still be saved/shared.
+    const imageUrl=URL.createObjectURL(pngBlob);
+    window.open(imageUrl,'_blank');
+    return false;
+  }
+}
+
+if($('discordShare')) $('discordShare').onclick=async()=>{
+  const btn=$('discordShare');
+  const old=btn.textContent;
+
+  const table=$('result').querySelector('.shift-matrix');
+  if(!table){
+    $('result').insertAdjacentHTML('afterbegin','<div class="status warn">先にシフトを自動作成してください。</div>');
+    return;
+  }
+
+  btn.disabled=true;
+  btn.textContent='画像を作成中…';
+
+  try{
+    const copied=await copyShiftTableAsImage();
+    btn.textContent=copied?'コピーしました！':'画像を開きました';
+  }catch(e){
+    console.error(e);
+    btn.textContent='コピーできませんでした';
+    $('result').insertAdjacentHTML('afterbegin','<div class="status warn">このブラウザでは画像のコピーに対応していない可能性があります。</div>');
+  }
+
+  setTimeout(()=>{
+    btn.textContent=old;
+    btn.disabled=false;
+  },1800);
+};
+
+</script>
+</body>
+</html>
