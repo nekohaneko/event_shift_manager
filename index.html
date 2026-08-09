@@ -136,7 +136,6 @@
     <h2>4. シフトを組む</h2>
     <p class="hint">各1時間枠について、シフト可能な人のうち<strong>内部値が高い順</strong>に最大4人を参加として選び、5人目以降は「待機」として表示します。待機欄を外した人は待機に入りません。</p>
     <button type="button" id="makeShift">シフトを自動作成</button>
-    <button type="button" class="secondary" id="discordShare">表を画像としてコピー</button>
     <div id="result" style="margin-top:14px;"></div>
   </section>
 </main>
@@ -517,121 +516,6 @@ addPlayRow();
 addShiftRow();
 addShiftRow();
 
-
-function copyShiftTableAsImage(){
-  const table=$('result').querySelector('.shift-matrix');
-  if(!table) return Promise.resolve(false);
-
-  const rows=[...table.querySelectorAll('tr')];
-  const cells=rows.map(row=>[...row.children]);
-  const colCount=Math.max(...cells.map(r=>r.length));
-  const colWidths=Array(colCount).fill(0);
-  const rowHeights=rows.map(()=>38);
-
-  // Measure the existing HTML table so the copied image follows its layout.
-  cells.forEach((row,ri)=>{
-    row.forEach((cell,ci)=>{
-      const rect=cell.getBoundingClientRect();
-      colWidths[ci]=Math.max(colWidths[ci],rect.width);
-      rowHeights[ri]=Math.max(rowHeights[ri],rect.height);
-    });
-  });
-
-  const scale=2;
-  const pad=24;
-  const width=colWidths.reduce((a,b)=>a+b,0);
-  const height=rowHeights.reduce((a,b)=>a+b,0);
-
-  const canvas=document.createElement('canvas');
-  canvas.width=Math.ceil((width+pad*2)*scale);
-  canvas.height=Math.ceil((height+pad*2)*scale);
-
-  const ctx=canvas.getContext('2d');
-  ctx.scale(scale,scale);
-  ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,width+pad*2,height+pad*2);
-
-  let y=pad;
-
-  rows.forEach((row,ri)=>{
-    let x=pad;
-    row.forEach((cell,ci)=>{
-      const w=colWidths[ci];
-      const h=rowHeights[ri];
-      const cs=getComputedStyle(cell);
-
-      // Background
-      ctx.fillStyle=cs.backgroundColor && cs.backgroundColor!=='rgba(0, 0, 0, 0)'
-        ? cs.backgroundColor : '#ffffff';
-      ctx.fillRect(x,y,w,h);
-
-      // Border
-      ctx.strokeStyle='#d9dde5';
-      ctx.lineWidth=1;
-      ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
-
-      // Text
-      const text=cell.innerText.replace(/\n+/g,' / ').trim();
-      ctx.fillStyle=cs.color || '#222';
-      const fontSize=parseFloat(cs.fontSize)||14;
-      const fontWeight=cs.fontWeight||'400';
-      ctx.font=`${fontWeight} ${fontSize}px sans-serif`;
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-
-      const lines=cell.innerText.split(/\n/).map(s=>s.trim()).filter(Boolean);
-      const lineHeight=fontSize+4;
-      const totalTextH=lines.length*lineHeight;
-      lines.forEach((line,li)=>{
-        let shown=line;
-        const maxChars=Math.max(4,Math.floor((w-12)/(fontSize*0.75)));
-        if(shown.length>maxChars) shown=shown.slice(0,maxChars-1)+'…';
-        ctx.fillText(shown,x+w/2,y+h/2-totalTextH/2+lineHeight*(li+0.5));
-      });
-
-      x+=w;
-    });
-    y+=rowHeights[ri];
-  });
-
-  // Use ClipboardItem's Promise-valued Blob so the clipboard operation itself
-  // stays attached to the original button click in Chrome.
-  const blobPromise=new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
-  return navigator.clipboard.write([
-    new ClipboardItem({'image/png':blobPromise})
-  ]).then(()=>true).catch(()=>false);
-}
-
-if($('discordShare')) $('discordShare').onclick=async()=>{
-  const btn=$('discordShare');
-  const old=btn.textContent;
-  const table=$('result').querySelector('.shift-matrix');
-
-  if(!table){
-    $('result').insertAdjacentHTML('afterbegin','<div class="status warn">先にシフトを自動作成してください。</div>');
-    return;
-  }
-
-  btn.disabled=true;
-  btn.textContent='画像をコピー中…';
-
-  const copied=await copyShiftTableAsImage();
-
-  if(copied){
-    btn.textContent='コピーしました！ Discordで貼り付けできます';
-  }else{
-    btn.textContent='コピーできませんでした';
-    $('result').insertAdjacentHTML(
-      'afterbegin',
-      '<div class="status warn">画像コピーがブラウザに拒否されました。GitHub PagesなどHTTPS上で開いているか確認してください。</div>'
-    );
-  }
-
-  setTimeout(()=>{
-    btn.textContent=old;
-    btn.disabled=false;
-  },2200);
-};
 
 </script>
 </body>
