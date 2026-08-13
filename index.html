@@ -63,7 +63,6 @@
 <body>
 <main>
   <h1>イベントシフト管理ツール</h1>
-  
   <p class="lead">自分のプレイ予定 → シフト提出 → 実効値・総合力の順で1時間あたり最大4人を自動選出。</p>
 
   <section class="card">
@@ -116,10 +115,7 @@
 
   <section class="card">
     <h2>3. シフト提出</h2>
-   <p class="hint" style="margin:0;">
-  名前・シフト可能時間・先頭値・内部値・総合力を入力。実効値は自動計算します。<br>
-  <span style="color:#222;">WLの場合は33.6万以上の総合力を入力しないようにしてください。</span>
-</p>
+    <p class="hint">名前・シフト可能時間・先頭値・内部値・総合力を入力。実効値は自動計算します。</p>
     
     <div class="table-wrap" style="margin-top:14px;">
       <table>
@@ -324,18 +320,18 @@ function addShiftRow(data={}){
         <button type="button" class="secondary details-toggle">詳細設定</button>
         <button type="button" class="danger remove">削除</button>
       </div>
-      <div class="details-panel hidden" style="margin-top:8px;padding:9px;border:1px solid var(--border);border-radius:8px;background:#fafbfc;">
-        <div style="margin-bottom:8px;font-size:16px;">
-          <div style="color:#222;">最大シフト時間</div>
+      <div class="details-panel hidden" style="margin-top:8px;padding:9px;border:1px solid var(--border);border-radius:8px;background:#fafbfc;min-width:150px;">
+        <div style="margin-bottom:8px;font-size:14px;">
+          <div style="color:#222;white-space:nowrap;">最大シフト時間</div>
           <div style="margin-top:4px;">
-            <input class="small max-hours" type="number" min="0" step="1" placeholder="無制限" value="${data.maxHours??''}">
+            <input class="small max-hours" type="number" min="0" step="1" placeholder="無制限" value="${data.maxHours??''}" style="font-size:14px;padding:7px 8px;">
           </div>
-          <div style="margin-top:3px;color:#888;">時間</div>
+          <div style="margin-top:3px;color:#888;font-size:14px;">時間</div>
         </div>
-        <label style="display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:7px;margin:0;font-size:16px;font-weight:600;white-space:nowrap;cursor:pointer;">
+        <label style="display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:7px;margin:0;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer;">
           <span style="white-space:nowrap;">待機×</span>
           <input class="no-wait-check" type="checkbox" ${data.waitOk===false?'checked':''}
-                 style="width:16px;height:16px;min-width:16px;margin:0;accent-color:#555;cursor:pointer;">
+                 style="width:15px;height:15px;min-width:15px;margin:0;accent-color:#555;cursor:pointer;">
         </label>
         <button type="button" class="wait-toggle" style="display:none">待機〇</button>
       </div>
