@@ -115,7 +115,7 @@
 
   <section class="card">
     <h2>3. シフト提出</h2>
-   <p class="hint" style="margin:0;">
+    <p class="hint" style="margin:0;">
   名前・シフト可能時間・先頭値・内部値・総合力を入力。実効値は自動計算します。<br>
   <span style="color:#222;">WLの場合は33.6万以上の総合力を入力しないようにしてください。</span>
 </p>
@@ -124,8 +124,7 @@
       <table>
         <thead>
           <tr>
-            <th>名前</th><th>シフト可能時間</th>
-            <th>先頭値</th><th>内部値</th><th>総合力</th><th>実効値</th><th></th>
+            <th>名前</th><th>先頭値</th><th>内部値</th><th>総合力</th><th>実効値</th><th>シフト可能時間</th>
           </tr>
         </thead>
         <tbody id="shiftBody"></tbody>
@@ -139,6 +138,7 @@
 
   <section class="card">
     <h2>4. シフトを組む</h2>
+    <p class="hint">各1時間枠について、シフト可能な人のうち<strong>内部値が高い順</strong>に最大4人を参加として選び、5人目以降は「待機」として表示します。「詳細設定」の「待機×」にチェックした人は待機に入りません。</p>
     <button type="button" id="makeShift">シフトを自動作成</button>
     <button type="button" class="secondary" id="discordShare">表をコピー</button>
     <div id="result" style="margin-top:14px;"></div>
@@ -309,14 +309,14 @@ function addShiftRow(data={}){
 
   tr.innerHTML=`
     <td><input class="person" placeholder="名前" value="${data.name||''}"></td>
+    <td><input class="small first" type="number" step="any" value="${data.first??''}"></td>
+    <td><input class="small internal" type="number" step="any" value="${data.internal??''}"></td>
+    <td><input class="small total" type="number" step="any" value="${data.total??''}"></td>
+    <td class="effective" style="min-width:60px;white-space:nowrap;text-align:center;">&nbsp;&nbsp; - &nbsp;&nbsp;</td>
     <td>
       <div class="availability-list"></div>
       <button type="button" class="add-availability">＋ 時間帯を追加</button>
     </td>
-    <td><input class="small first" type="number" step="any" value="${data.first??''}"></td>
-    <td><input class="small internal" type="number" step="any" value="${data.internal??''}"></td>
-    <td><input class="small total" type="number" step="any" value="${data.total??''}"></td>
-    <td class="effective">-</td>
     <td>
       <div class="shift-actions" style="display:flex;flex-direction:column;gap:5px;align-items:stretch;">
         <button type="button" class="secondary details-toggle">詳細設定</button>
@@ -498,7 +498,7 @@ $('makeShift').onclick=()=>{
     const waitOk=waitButton ? !waitButton.classList.contains('no-wait') : true;
     const maxHoursValue=parseFloat(tr.querySelector('.max-hours')?.value);
     const maxHours=Number.isFinite(maxHoursValue) && maxHoursValue >= 0 ? maxHoursValue : Infinity;
-    const effective=(Number.isFinite(first)&&Number.isFinite(internal))?((internal-first)/5)+first:NaN;
+    const effective=(Number.isFinite(first)&&Number.isFinite(internal))?Math.floor(((internal-first)/5)+first):NaN;
     return {name,slots,first,internal,total,effective,waitOk,maxHours,assignedHours:0};
   }).filter(p=>Number.isFinite(p.internal));
 
