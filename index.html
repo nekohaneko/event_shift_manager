@@ -406,7 +406,7 @@ function calcEffective(tr){
   const internal=parseFloat(tr.querySelector('.internal').value);
   const cell=tr.querySelector('.effective');
   if(Number.isFinite(first)&&Number.isFinite(internal)){
-    const v=((internal-first)/5)+first;
+    const v=Math.floor(((internal-first)/5)+first);
     cell.textContent=Number.isInteger(v)?v:v.toFixed(2);
   }else cell.textContent='-';
 }
