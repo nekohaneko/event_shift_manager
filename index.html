@@ -117,7 +117,7 @@
     <h2>3. シフト提出</h2>
     <p class="hint" style="margin:0;">
   名前・シフト可能時間・先頭値・内部値・総合力を入力。実効値は自動計算します。<br>
-  <span style="color:#222;">WLの場合は33.6万以上の総合力を入力しないようにしてください。</span>
+  <div style="margin-top:6px;font-weight:600;color:#b33;">⚠ WLの場合は33.6万以上の総合力を入力しないでください</div>
 </p>
     
     <div class="table-wrap" style="margin-top:14px;">
@@ -431,9 +431,9 @@ function localDate(day,time){
 
 function getPlannedHours(){
   const rows=[...document.querySelectorAll('.play-row')];
-  const out=[];
+  const ranges=[];
 
-  for(const r of rows){
+  for(const [playIndex,r] of rows.entries()){
     const startDay=Number(r.querySelector('.play-start-day').value);
     const endDay=Number(r.querySelector('.play-end-day').value);
     const [sh,sm]=r.querySelector('.play-start').value.split(':').map(Number);
@@ -442,26 +442,37 @@ function getPlannedHours(){
     const a=new Date(Number($('year').value),Number($('month').value)-1,startDay,sh,sm);
     const b=new Date(Number($('year').value),Number($('month').value)-1,endDay,eh,em);
 
-    if(b>a) out.push({a,b});
+    if(b>a) ranges.push({a,b,playIndex});
   }
 
-  if(out.length===0) return [];
+  if(ranges.length===0) return [];
 
-  // イベント期間は任意。プレイ予定の最初～最後をそのまま使用する。
-  const minTime=new Date(Math.min(...out.map(x=>x.a.getTime())));
-  const maxTime=new Date(Math.max(...out.map(x=>x.b.getTime())));
-
+  // 各「プレイ予定」の区切りを保持したまま、1時間枠を作る。
+  // 同じ時間帯が複数のプレイ予定に含まれる場合は、先に入力された予定を採用する。
   const hours=[];
-  const base=new Date(minTime);
-  base.setMinutes(0,0,0);
+  const seen=new Set();
 
-  for(let t=new Date(base); t<maxTime; t=new Date(t.getTime()+3600000)){
-    const hEnd=new Date(t.getTime()+3600000);
-    if(t < minTime || hEnd > maxTime) continue;
-    if(out.some(x=>x.a<=t && x.b>=hEnd)){
-      hours.push({start:new Date(t),end:hEnd});
+  for(const {a,b,playIndex} of ranges){
+    const base=new Date(a);
+    base.setMinutes(0,0,0);
+
+    for(let t=new Date(base); t<b; t=new Date(t.getTime()+3600000)){
+      const hEnd=new Date(t.getTime()+3600000);
+      if(t < a || hEnd > b) continue;
+
+      const key=t.getTime();
+      if(seen.has(key)) continue;
+
+      seen.add(key);
+      hours.push({
+        start:new Date(t),
+        end:hEnd,
+        playIndex
+      });
     }
   }
+
+  hours.sort((a,b)=>a.start.getTime()-b.start.getTime());
   return hours;
 }
 function fmt(d){
@@ -556,11 +567,17 @@ $('makeShift').onclick=()=>{
   // 表示は元の時間順に戻す。
   const slotResults=slots.map(slot=>resultMap.get(slot.start.getTime()));
 
-  // 「前の枠の終了時刻 == 次の枠の開始時刻」の間だけ連続扱い。
+  // 「同じプレイ予定の中」で、前の枠の終了時刻 == 次の枠の開始時刻
+  // の場合だけ同じ表にまとめる。
+  // プレイ予定を別々に入力した場合は、時間が連続していても表を分ける。
   const groups=[];
   for(const result of slotResults){
     const last=groups[groups.length-1];
-    if(last && last[last.length-1].slot.end.getTime()===result.slot.start.getTime()){
+    if(
+      last &&
+      last[last.length-1].slot.end.getTime()===result.slot.start.getTime() &&
+      last[last.length-1].slot.playIndex===result.slot.playIndex
+    ){
       last.push(result);
     }else{
       groups.push([result]);
