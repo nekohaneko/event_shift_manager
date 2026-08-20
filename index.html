@@ -141,6 +141,8 @@
     <p class="hint">各1時間枠について、シフト可能な人のうち<strong>内部値が高い順</strong>に最大4人を参加として選び、5人目以降は「待機」として表示します。「詳細設定」の「待機×」にチェックした人は待機に入りません。</p>
     <button type="button" id="makeShift">シフトを自動作成</button>
     <button type="button" class="secondary" id="discordShare">表をコピー</button>
+    <button type="button" class="secondary" id="clearSavedData">保存データを消去</button>
+    <span id="saveStatus" class="hint" style="align-self:center;"></span>
     <div id="result" style="margin-top:14px;"></div>
   </section>
 </main>
@@ -637,12 +639,142 @@ function escapeHtml(s){
   return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+
+// ===== 入力内容の自動保存 =====
+// ブラウザのlocalStorageに保存するため、このHTMLファイルを閉じても
+// 同じブラウザで開き直せば入力内容を復元できます。
+const STORAGE_KEY = 'event_shift_manager_saved_v1';
+
+function collectFormData(){
+  return {
+    event: {
+      year: $('year').value,
+      month: $('month').value,
+      startDay: $('startDay').value,
+      startTime: $('startTime').value,
+      endDay: $('endDay').value,
+      endTime: $('endTime').value,
+      ymOpen: !$('eventYM').classList.contains('hidden')
+    },
+    playRows: [...$('playRows').querySelectorAll('.play-row')].map(row => ({
+      startDay: row.querySelector('.play-start-day').value,
+      start: row.querySelector('.play-start').value,
+      endDay: row.querySelector('.play-end-day').value,
+      end: row.querySelector('.play-end').value
+    })),
+    shiftRows: [...$('shiftBody').querySelectorAll('tr')].map(tr => ({
+      name: tr.querySelector('.person').value,
+      first: tr.querySelector('.first').value,
+      internal: tr.querySelector('.internal').value,
+      total: tr.querySelector('.total').value,
+      maxHours: tr.querySelector('.max-hours')?.value ?? '',
+      waitOk: !(tr.querySelector('.no-wait-check')?.checked),
+      slots: [...tr.querySelectorAll('.availability-row')].map(row => ({
+        startDay: row.querySelector('.shift-start-day').value,
+        start: row.querySelector('.shift-start').value,
+        endDay: row.querySelector('.shift-end-day').value,
+        end: row.querySelector('.shift-end').value
+      }))
+    }))
+  };
+}
+
+function saveFormData(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectFormData()));
+    const status = $('saveStatus');
+    if(status){
+      status.textContent = '自動保存済み';
+      clearTimeout(window.__saveStatusTimer);
+      window.__saveStatusTimer = setTimeout(()=>status.textContent='', 1500);
+    }
+  }catch(e){
+    console.warn('入力内容の保存に失敗しました:', e);
+  }
+}
+
+function loadFormData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+
+    if(data.event){
+      if(data.event.year) $('year').value = data.event.year;
+      if(data.event.month) $('month').value = data.event.month;
+      fillDays();
+      fillTimes();
+      if(data.event.startDay) $('startDay').value = data.event.startDay;
+      if(data.event.startTime) $('startTime').value = data.event.startTime;
+      if(data.event.endDay) $('endDay').value = data.event.endDay;
+      if(data.event.endTime) $('endTime').value = data.event.endTime;
+    }
+
+    $('playRows').innerHTML = '';
+    (data.playRows || []).forEach(row => addPlayRow(row));
+
+    $('shiftBody').innerHTML = '';
+    (data.shiftRows || []).forEach(row => addShiftRow(row));
+
+    if(data.event?.ymOpen){
+      $('eventYM').classList.remove('hidden');
+      $('toggleYM').textContent = '年・月を閉じる';
+    }else{
+      $('eventYM').classList.add('hidden');
+      $('toggleYM').textContent = '年・月を入力';
+    }
+
+    updateEvent();
+
+    if(!data.playRows?.length) addPlayRow();
+    if(!data.shiftRows?.length){
+      addShiftRow();
+      addShiftRow();
+    }
+
+    const status = $('saveStatus');
+    if(status) status.textContent = '保存データを復元しました';
+    setTimeout(()=>{ if(status) status.textContent=''; }, 1800);
+    return true;
+  }catch(e){
+    console.warn('保存データの復元に失敗しました:', e);
+    return false;
+  }
+}
+
+function clearSavedData(){
+  if(!confirm('保存されている入力内容を消去しますか？')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+$('clearSavedData').onclick = clearSavedData;
+
+// 入力・追加・削除などの変更をまとめて監視して自動保存。
+// change/inputの両方を使うことで、文字入力中の値も保存されます。
+let saveTimer = null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveFormData, 250);
+}
+document.addEventListener('input', scheduleSave);
+document.addEventListener('change', scheduleSave);
+
+// ボタン操作による行追加・削除なども拾う。
+const saveObserver = new MutationObserver(scheduleSave);
+saveObserver.observe($('playRows'), {childList:true, subtree:true});
+saveObserver.observe($('shiftBody'), {childList:true, subtree:true});
+
+
 // 初期表示
 fillDays();
 fillTimes();
-addPlayRow();
-addShiftRow();
-addShiftRow();
+if(!loadFormData()){
+  addPlayRow();
+  addShiftRow();
+  addShiftRow();
+}
+updateEvent();
 
 
 function copyShiftTableExcel(){
